@@ -87,8 +87,86 @@ def fetch_all(start_page=1):
     # save the dataframe to csv
     df.to_csv(csv_file, index=False)
 
+# obtain more details about a specific painting
+def fetch_detail(id):
+    url = f'https://minghuaji.dpm.org.cn/paint/detail?id={id}'
+
+    res = requests.get(url)
+    # check for successful request
+    if res.status_code != 200:
+        raise ValueError(f'Encountered error when visiting {url}: {res.status_code}')
+
+    # parse the response text and extract painting info
+    html_string = res.text
+    soup = BeautifulSoup(html_string, 'html.parser')
+    info = soup.select_one('.pf_main').select_one('h3')
+    splitted = [x.strip() for x in info.text.split('，')]
+
+    # extract details
+    if splitted[2][0] == '纵':
+        material = ''
+        color = ''
+        height = splitted[2]
+        width = splitted[3]
+    elif splitted[3][0] == '纵':
+        material = splitted[2]
+        color = ''
+        height = splitted[3]
+        width = splitted[4]
+    elif splitted[4][0] == '纵':
+        material = splitted[2]
+        color = splitted[3]
+        height = splitted[4]
+        width = splitted[5]
+    elif splitted[5][0] == '纵':
+        material = splitted[2]
+        color = f'{splitted[3]}，{splitted[4]}'
+        height = splitted[5]
+        width = splitted[6]
+
+    # check width and height
+    if height[0] != '纵': raise ValueError(f'Cannot find height in {info.text}')
+    if width[0] != '横': raise ValueError(f'Cannot find width in {info.text}')
+
+    # extract the numbers
+    height = float(re.findall('[\d\.,]+',height)[0].replace(',',''))
+    width = float(re.findall('[\d\.,]+',width)[0].replace(',',''))
+
+    print(f'id: {id}, material: {material}, color: {color}, height: {height}, width: {width}')
+
+    return {
+        'material': material,
+        'color': color,
+        'height': height,
+        'width': width
+    }
+
+
+# obtain more details for all paintings
+def fetch_details():
+    # read data
+    csv_file = 'paintings.csv'
+    if os.path.exists(csv_file):
+        df = pd.read_csv(csv_file)
+    else:
+        raise ValueError(f'Cannot find {csv_file}')
+
+    # create new columns
+    for col in ['material', 'color', 'height', 'width']:
+        if col not in df.columns: df[col] = ''
+
+    # fetch details for each painting
+    for idx, paint_id in df['id'].iteritems():
+        info = fetch_detail(paint_id)
+        for col in ['material', 'color', 'height', 'width']:
+            df.loc[idx, col] = info[col]
+
+    # save the dataframe to csv
+    df.to_csv(csv_file, index=False)
+
 if __name__ == '__main__':
     # start from the specified page
     start_page = int(sys.argv[1]) if len(sys.argv) > 1 else 1
 
     fetch_all(start_page)
+    # fetch_details() # obtain more details
