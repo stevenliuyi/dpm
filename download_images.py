@@ -3,7 +3,7 @@ import subprocess
 import os
 from generate_dzi import generate_dzi_file, get_info
 
-def download_image(paint_id, info=None):
+def download_image(paint_id, info=None, download_largest=False):
     # check if image already exists
     paint_file = f'paintings/{paint_id}.png'
     if os.path.exists(paint_file):
@@ -19,7 +19,7 @@ def download_image(paint_id, info=None):
     dezoomify = os.environ.get('DEZOOMIFY_RS')
     if dezoomify is None: dezoomify = 'dezoomify-rs'
 
-    command = f'{dezoomify} --dezoomer deepzoom "{dzi_file}" --header "Referer: https://www.dpm.org.cn" --retries 10 --largest {paint_file}'
+    command = f'{dezoomify} --dezoomer deepzoom "{dzi_file}" --header "Referer: https://www.dpm.org.cn" --retries 10 {"--largest " if download_largest else ""}{paint_file}'
     subprocess.run(command, shell=True)
 
 def download_all():
@@ -30,7 +30,7 @@ def download_all():
     for index, row in df.iterrows():
         paint_id = row['id']
         print(f'Painting {paint_id} ({index + 1}/{len(df)}) ...')
-        download_image(paint_id, info=info)
+        download_image(paint_id, info=info, download_largest=True)
 
 if __name__ == '__main__':
     # create directory if not exists
