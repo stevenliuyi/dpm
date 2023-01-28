@@ -80,6 +80,10 @@ def generate_dzi_file(paint_id, info=None):
     xmlns = info2bytes(info[28]).decode('utf-8')
     overlap = info2bytes(info[29]).decode('utf-8')
 
+    # check if paintings folder exists
+    if not os.path.exists('paintings'):
+        os.makedirs('paintings')
+
     # create dzi file
     file = open(f'paintings/{paint_id}.dzi', 'wb')
     doc = xml.dom.minidom.Document()
