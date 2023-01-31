@@ -2,15 +2,10 @@ import pandas as pd
 import subprocess
 import os
 import sys
+import re
 from generate_dzi import generate_dzi_file, get_info
 
 def download_image(website, paint_id, info=None, download_largest=False):
-    # check if image already exists
-    paint_file = f'paintings/{paint_id}.png'
-    if os.path.exists(paint_file):
-        print(f'Painting {paint_id} already exists.')
-        return
-
     # check if dzi file exists
     dzi_file = f'paintings/{paint_id}.dzi'
     if not os.path.exists(dzi_file):
@@ -19,6 +14,13 @@ def download_image(website, paint_id, info=None, download_largest=False):
         except Exception as e:
             print(f'Failed to generate dzi file for painting {paint_id}: {e}')
             return
+
+    # check if image already exists
+    format = re.search('Format="(\w+)"', open(dzi_file, 'r').read()).group(1)
+    paint_file = f'paintings/{paint_id}.{format}'
+    if os.path.exists(paint_file):
+        print(f'Painting {paint_id} already exists.')
+        return
 
     # dezoomify-rs
     dezoomify = os.environ.get('DEZOOMIFY_RS')
