@@ -1,11 +1,17 @@
 import base64
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
+from bs4 import BeautifulSoup
+import xml.etree.ElementTree as ET
 import requests
 import re
 import xml.dom.minidom
 import sys
 import os
+
+################################################################
+## Minghua Ji (https://minghuaji.dpm.org.cn/)
+################################################################
 
 # get text from url
 def get_text_from_url(url):
@@ -64,7 +70,7 @@ def get_encrypted_text(paint_url):
         raise ValueError(f'Cannot find encrypted string in {paint_url}')
 
 # generate the dzi file
-def generate_dzi_file(paint_id, info=None):
+def generate_dzi_file_mhj(paint_id, info=None):
     paint_url = f'https://minghuaji.dpm.org.cn/paint/appreciate?id={paint_id}'
 
     # get info
@@ -80,6 +86,59 @@ def generate_dzi_file(paint_id, info=None):
     xmlns = info2bytes(info[28]).decode('utf-8')
     overlap = info2bytes(info[29]).decode('utf-8')
 
+    # create dzi file
+    dzi_info = {
+        'xmlns': xmlns,
+        'url': decrypted[0],
+        'overlap': overlap,
+        'tilesize': decrypted[4],
+        'format': decrypted[1],
+        'width': str(int(float(decrypted[2]))),
+        'height': str(int(float(decrypted[3])))
+    }
+    write_dzi_file(paint_id, dzi_info)
+
+################################################################
+## Collection (https://www.dpm.org.cn/explore/collections.html)
+################################################################
+
+def generate_dzi_file_collection(paint_id):
+    url = f'https://www.dpm.org.cn/collection/paint/{paint_id}.html'
+    html_string = get_text_from_url(url)
+    soup = BeautifulSoup(html_string, 'html.parser')
+
+    # get dzi url
+    item = soup.select_one('#hl_content')
+    image_item = item.select_one('img')
+    tilegenerator_url = image_item.get('custom_tilegenerator').replace('dyx.html?path=/', '')
+    tilegenerator = get_text_from_url(tilegenerator_url)
+
+    # get dzi info
+    root = ET.fromstring(tilegenerator)
+    dzi_info = {
+        'xmlns': root.attrib['xmnls'],
+        'url': tilegenerator_url.replace('http:','https:').replace('.xml', '_files/'),
+        'overlap': root.attrib['Overlap'],
+        'tilesize': root.attrib['TileSize'],
+        'format': root.attrib['Format'],
+        'width': root[0].attrib['Width'],
+        'height': root[0].attrib['Height']
+    }
+    write_dzi_file(paint_id, dzi_info)
+
+################################################################
+## common functions
+################################################################
+
+def generate_dzi_file(website, paint_id, info=None):
+    if website == 'mhj':
+        generate_dzi_file_mhj(paint_id, info)
+    elif website == 'collection':
+        generate_dzi_file_collection(paint_id)
+    else:
+        raise ValueError(f'Unknown website {website}')
+
+def write_dzi_file(paint_id, dzi_info):
     # check if paintings folder exists
     if not os.path.exists('paintings'):
         os.makedirs('paintings')
@@ -87,24 +146,27 @@ def generate_dzi_file(paint_id, info=None):
     # create dzi file
     file = open(f'paintings/{paint_id}.dzi', 'wb')
     doc = xml.dom.minidom.Document()
-    image = doc.createElementNS(xmlns, 'Image')
-    image.setAttribute('xmlns', xmlns)
-    image.setAttribute('Url', decrypted[0])
-    image.setAttribute('Overlap', overlap)
-    image.setAttribute('TileSize', decrypted[4])
-    image.setAttribute('Format', decrypted[1])
-    size = doc.createElementNS(xmlns, 'Size')
-    size.setAttribute('Width', str(int(float(decrypted[2]))))
-    size.setAttribute('Height', str(int(float(decrypted[3]))))
+    image = doc.createElementNS(dzi_info['xmlns'], 'Image')
+    image.setAttribute('xmlns', dzi_info['xmlns'])
+    image.setAttribute('Url', dzi_info['url'])
+    image.setAttribute('Overlap', dzi_info['overlap'])
+    image.setAttribute('TileSize', dzi_info['tilesize'])
+    image.setAttribute('Format', dzi_info['format'])
+    size = doc.createElementNS(dzi_info['xmlns'], 'Size')
+    size.setAttribute('Width', dzi_info['width'])
+    size.setAttribute('Height', dzi_info['height'])
     image.appendChild(size)
     doc.appendChild(image)
     descriptor = doc.toxml(encoding='UTF-8')
     file.write(descriptor)
     file.close()
 
+
 if __name__ == '__main__':
     # create the directory to store the dzi files
     if not os.path.exists('paintings'): os.makedirs('paintings')
 
-    paint_id = sys.argv[1]
-    generate_dzi_file(paint_id)
+    website = sys.argv[1]
+    paint_id = sys.argv[2]
+
+    generate_dzi_file(website=website, id=paint_id)

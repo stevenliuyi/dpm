@@ -1,4 +1,4 @@
-This repository contains scripts for downloading images from the *Minghuaji* project of the Palace Museum (故宫名画记).
+This repository contains scripts for downloading images from the Palace Museum. It supports both [*Minghuaji*](https://minghuaji.dpm.org.cn/) (故宫名画记) and [the collections on the official website](https://www.dpm.org.cn/explore/collections.html) .
 
 ## Usage
 
@@ -8,22 +8,28 @@ This repository contains scripts for downloading images from the *Minghuaji* pro
 export DEZOOMIFY_RS=$HOME/dezoomify-rs/dezoomify-rs
 ```
 
-To generate a list of all images and save it as `paintings.csv`:
+To generate a list of all images on the website and save it as `paintings.csv`:
 
 ```
-python fetch_paintings.py
+python fetch_paintings.py [website]
 ```
+
+The parameter `website` should be one of `mhj` (for *Minghuaji*) and `collection` (for the official website).
 
 To download all images based on the data in `paintings.csv`:
 
 ```
-python download_images.py
+python download_images.py [website]
 ```
 
 To download a single image with a specific id:
 
 ```
-python -c "from download_images import *; download_image('0196af7228c14f098185c9bdbd19b6e7')"
+python -c "from download_images import *; download_image([website], [paint_id])"
 ```
 
-The above command downloads image from https://minghuaji.dpm.org.cn/paint/detail?id=0196af7228c14f098185c9bdbd19b6e7. In this case, there is no need to generate `paintings.csv`.
+For instance, the following command downloads image from https://minghuaji.dpm.org.cn/paint/detail?id=0196af7228c14f098185c9bdbd19b6e7. In this case, there is no need to generate `paintings.csv` using `fetch_paintings.csv`.
+
+```
+python -c "from download_images import *; download_image('mhj', '0196af7228c14f098185c9bdbd19b6e7')"
+```
