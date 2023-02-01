@@ -102,6 +102,24 @@ def generate_dzi_file_mhj(paint_id, info=None):
 ## Collection (https://www.dpm.org.cn/explore/collections.html)
 ################################################################
 
+# get dzi info from an uncommon type of url
+def get_dzi_info_bigimg(url):
+    html_string = get_text_from_url(url)
+    soup = BeautifulSoup(html_string, 'html.parser')
+    script = soup.find_all('script')[-1].text
+
+    if not 'OpenSeadragon' in script:
+        raise ValueError(f'Cannot find OpenSeadragon in {url}')
+    script = script.split('tileSources:')[1]
+    keys = ['xmlns', 'Url', 'Overlap', 'TileSize', 'Format', 'Width', 'Height']
+    dzi_info = {}
+    for key in keys:
+        value = re.search(rf'{key}:\s*"(.*?)",', script).group(1)
+        dzi_info[key.lower()] = value
+
+    return dzi_info
+
+
 def generate_dzi_file_collection(paint_id):
     url = f'https://www.dpm.org.cn/collection/paint/{paint_id}.html'
     html_string = get_text_from_url(url)
@@ -111,19 +129,25 @@ def generate_dzi_file_collection(paint_id):
     item = soup.select_one('#hl_content')
     image_item = item.select_one('img')
     tilegenerator_url = image_item.get('custom_tilegenerator').replace('dyx.html?path=/', '')
-    tilegenerator = get_text_from_url(tilegenerator_url)
 
-    # get dzi info
-    root = ET.fromstring(tilegenerator)
-    dzi_info = {
-        'xmlns': root.attrib['xmnls'],
-        'url': tilegenerator_url.replace('http:','https:').replace('.xml', '_files/'),
-        'overlap': root.attrib['Overlap'],
-        'tilesize': root.attrib['TileSize'],
-        'format': root.attrib['Format'],
-        'width': root[0].attrib['Width'],
-        'height': root[0].attrib['Height']
-    }
+    if not 'bigimg' in tilegenerator_url:
+        tilegenerator = get_text_from_url(tilegenerator_url)
+
+        # get dzi info
+        root = ET.fromstring(tilegenerator)
+        dzi_info = {
+            'xmlns': root.attrib['xmnls'],
+            'url': tilegenerator_url.replace('http:','https:').replace('.xml', '_files/'),
+            'overlap': root.attrib['Overlap'],
+            'tilesize': root.attrib['TileSize'],
+            'format': root.attrib['Format'],
+            'width': root[0].attrib['Width'],
+            'height': root[0].attrib['Height']
+        }
+    else:
+        print(tilegenerator_url)
+        dzi_info = get_dzi_info_bigimg(tilegenerator_url)
+
     write_dzi_file(paint_id, dzi_info)
 
 ################################################################
