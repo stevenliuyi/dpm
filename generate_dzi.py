@@ -142,7 +142,7 @@ def generate_dzi_file_collection(paint_id):
 
     tilegenerator_urls = [item.get('custom_tilegenerator').replace('dyx.html?path=/', '') for item in image_items]
     # remove duplicates
-    tilegenerator_urls = list(set(tilegenerator_urls))
+    tilegenerator_urls =pd.Series(tilegenerator_urls).drop_duplicates().tolist()
 
     for idx, tilegenerator_url in enumerate(tilegenerator_urls):
         if not 'bigimg' in tilegenerator_url:
