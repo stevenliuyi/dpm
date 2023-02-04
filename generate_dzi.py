@@ -72,6 +72,9 @@ def get_encrypted_text(paint_url):
 # generate the dzi file
 def generate_dzi_file_mhj(paint_id, info=None):
     paint_url = f'https://minghuaji.dpm.org.cn/paint/appreciate?id={paint_id}'
+    html_string = get_text_from_url(paint_url)
+    soup = BeautifulSoup(html_string, 'html.parser')
+    image_items = soup.select_one('#gundong_id').find_all('li')
 
     # get info
     if info is None: info = get_info()
@@ -79,24 +82,32 @@ def generate_dzi_file_mhj(paint_id, info=None):
     # get key and vi and use them to decrypt the encrypted string
     key = info2bytes(info[1])
     iv = info2bytes(info[4])
-    encrypted = get_encrypted_text(paint_url)
-    decrypted = decrypt(encrypted, key, iv)
 
-    # get xmlns and overlap
-    xmlns = info2bytes(info[28]).decode('utf-8')
-    overlap = info2bytes(info[29]).decode('utf-8')
+    for idx, item in enumerate(image_items):
+        paint_detail_url = f'{paint_url}&type={item.get("value")}'
 
-    # create dzi file
-    dzi_info = {
-        'xmlns': xmlns,
-        'url': decrypted[0],
-        'overlap': overlap,
-        'tilesize': decrypted[4],
-        'format': decrypted[1],
-        'width': str(int(float(decrypted[2]))),
-        'height': str(int(float(decrypted[3])))
-    }
-    write_dzi_file(paint_id, dzi_info)
+        encrypted = get_encrypted_text(paint_detail_url)
+        decrypted = decrypt(encrypted, key, iv)
+
+        # get xmlns and overlap
+        xmlns = info2bytes(info[28]).decode('utf-8')
+        overlap = info2bytes(info[29]).decode('utf-8')
+
+        # create dzi file
+        dzi_info = {
+            'xmlns': xmlns,
+            'url': decrypted[0],
+            'overlap': overlap,
+            'tilesize': decrypted[4],
+            'format': decrypted[1],
+            'width': str(int(float(decrypted[2]))),
+            'height': str(int(float(decrypted[3])))
+        }
+        if len(image_items) == 1:
+            dzi_filename = f'{paint_id}.dzi'
+        else:
+            dzi_filename = f'{paint_id}_{idx}.dzi'
+        write_dzi_file(dzi_filename, dzi_info)
 
 ################################################################
 ## Collection (https://www.dpm.org.cn/explore/collections.html)
@@ -126,29 +137,36 @@ def generate_dzi_file_collection(paint_id):
     soup = BeautifulSoup(html_string, 'html.parser')
 
     # get dzi url
-    item = soup.select_one('#hl_content')
-    image_item = item.select_one('img')
-    tilegenerator_url = image_item.get('custom_tilegenerator').replace('dyx.html?path=/', '')
+    #item = soup.select_one('#hl_content')
+    image_items = soup.find_all('img', {'custom_tilegenerator': re.compile(r'http://en.dpm.org.cn/.*')})
 
-    if not 'bigimg' in tilegenerator_url:
-        tilegenerator = get_text_from_url(tilegenerator_url)
+    tilegenerator_urls = [item.get('custom_tilegenerator').replace('dyx.html?path=/', '') for item in image_items]
+    # remove duplicates
+    tilegenerator_urls = list(set(tilegenerator_urls))
 
-        # get dzi info
-        root = ET.fromstring(tilegenerator)
-        dzi_info = {
-            'xmlns': root.attrib['xmnls'],
-            'url': tilegenerator_url.replace('http:','https:').replace('.xml', '_files/'),
-            'overlap': root.attrib['Overlap'],
-            'tilesize': root.attrib['TileSize'],
-            'format': root.attrib['Format'],
-            'width': root[0].attrib['Width'],
-            'height': root[0].attrib['Height']
-        }
-    else:
-        print(tilegenerator_url)
-        dzi_info = get_dzi_info_bigimg(tilegenerator_url)
+    for idx, tilegenerator_url in enumerate(tilegenerator_urls):
+        if not 'bigimg' in tilegenerator_url:
+            tilegenerator = get_text_from_url(tilegenerator_url)
 
-    write_dzi_file(paint_id, dzi_info)
+            # get dzi info
+            root = ET.fromstring(tilegenerator)
+            dzi_info = {
+                'xmlns': root.attrib['xmnls'],
+                'url': tilegenerator_url.replace('http:','https:').replace('.xml', '_files/'),
+                'overlap': root.attrib['Overlap'],
+                'tilesize': root.attrib['TileSize'],
+                'format': root.attrib['Format'],
+                'width': root[0].attrib['Width'],
+                'height': root[0].attrib['Height']
+            }
+        else:
+            dzi_info = get_dzi_info_bigimg(tilegenerator_url)
+
+        if len(image_items) == 1:
+            dzi_filename = f'{paint_id}.dzi'
+        else:
+            dzi_filename = f'{paint_id}_{idx}.dzi'
+        write_dzi_file(dzi_filename, dzi_info)
 
 ################################################################
 ## common functions
@@ -162,13 +180,13 @@ def generate_dzi_file(website, paint_id, info=None):
     else:
         raise ValueError(f'Unknown website {website}')
 
-def write_dzi_file(paint_id, dzi_info):
+def write_dzi_file(dzi_filename, dzi_info):
     # check if paintings folder exists
     if not os.path.exists('paintings'):
         os.makedirs('paintings')
 
     # create dzi file
-    file = open(f'paintings/{paint_id}.dzi', 'wb')
+    file = open(f'paintings/{dzi_filename}', 'wb')
     doc = xml.dom.minidom.Document()
     image = doc.createElementNS(dzi_info['xmlns'], 'Image')
     image.setAttribute('xmlns', dzi_info['xmlns'])
