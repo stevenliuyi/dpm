@@ -8,6 +8,7 @@ import re
 import xml.dom.minidom
 import sys
 import os
+import pandas as pd
 
 ################################################################
 ## Minghua Ji (https://minghuaji.dpm.org.cn/)
