@@ -14,19 +14,7 @@ import pandas as pd
 ## Minghua Ji (https://minghuaji.dpm.org.cn/)
 ################################################################
 
-# get text from url
-def get_text_from_url(url):
-
-    # get response from the url
-    res = requests.get(url)
-
-    # check for successful request
-    if res.status_code != 200:
-        raise ValueError(f'Encountered error when visiting {url}: {res.status_code}')
-
-    return res.text
-
-# get gv info from url
+# get gv info from url (minghuaji)
 def get_info():
     gv_url = 'https://minghuaji.dpm.org.cn/js/gve.js'
 
@@ -41,34 +29,6 @@ def get_info():
         raise ValueError(f'Encountered error when parsing {gv_url}')
 
     return info
-
-# convert info to bytes
-def info2bytes(info):
-    return bytes.fromhex(info.replace('\\x',''))
-
-# decrypt the encrypted string
-def decrypt(encrypted, key, iv):
-    # create cipher object
-    cipher = AES.new(key, AES.MODE_CBC, iv)
-
-    # decrypt the encrypted string
-    decrypted = cipher.decrypt(base64.b64decode(encrypted))
-    decrypted = unpad(decrypted, 16).decode('utf-8').split('^')
-
-    return decrypted
-
-# get the encrypted string from the paint url
-def get_encrypted_text(paint_url):
-    # get response from the url
-    res_text = get_text_from_url(paint_url)
-
-    # find the first substring that matches the encrypted string
-    match = re.search(r'gv.init\("(.*?)"', res_text)
-    if match:
-        encrypted = match.group(1)
-        return encrypted
-    else:
-        raise ValueError(f'Cannot find encrypted string in {paint_url}')
 
 # generate the dzi file
 def generate_dzi_file_mhj(paint_id, info=None):
@@ -169,15 +129,110 @@ def generate_dzi_file_collection(paint_id):
             dzi_filename = f'{paint_id}_{idx}.dzi'
         write_dzi_file(dzi_filename, dzi_info)
 
+
+################################################################
+## Digital Catalog (https://digicol.dpm.org.cn/)
+################################################################
+
+# get gv info from url (digicol)
+def get_info_digicol():
+    gv_url = 'https://digicol.dpm.org.cn/js/gve.js'
+
+    # get response from the url
+    res_text = get_text_from_url(gv_url)
+
+    info = re.findall(r'"(.*?)"', res_text)[3]
+    info = info2bytes(info).decode('utf-8').split('|')
+
+    return info
+
+# generate the dzi file
+def generate_dzi_file_digicol(paint_id, info=None):
+    paint_url = f'https://digicol.dpm.org.cn/cultural/listCulturalImage?id={paint_id}'
+    html_string = get_text_from_url(paint_url)
+    soup = BeautifulSoup(html_string, 'html.parser')
+
+    # get image id
+    image_id = soup.select_one('#swiper-wrapper-img').select_one('div').get('value')
+
+    # get info
+    if info is None: info = get_info_digicol()
+
+    # get key and vi and use them to decrypt the encrypted string
+    key = info[35].encode('utf-8')
+    iv = info[45].encode('utf-8')
+
+    paint_detail_url = f'https://digicol.dpm.org.cn/cultural/details?id={image_id}'
+
+    encrypted = get_encrypted_text(paint_detail_url)
+    decrypted = decrypt(encrypted, key, iv)
+
+    # create dzi file
+    dzi_info = {
+        'xmlns': 'http://schemas.microsoft.com/deepzoom/2009',
+        'url': decrypted[0],
+        'overlap': '1',
+        'tilesize': decrypted[4],
+        'format': decrypted[1],
+        'width': str(int(float(decrypted[2]))),
+        'height': str(int(float(decrypted[3])))
+    }
+
+    dzi_filename = f'{paint_id}.dzi'
+    write_dzi_file(dzi_filename, dzi_info)
+
+
 ################################################################
 ## common functions
 ################################################################
+
+# get text from url
+def get_text_from_url(url):
+
+    # get response from the url
+    res = requests.get(url)
+
+    # check for successful request
+    if res.status_code != 200:
+        raise ValueError(f'Encountered error when visiting {url}: {res.status_code}')
+
+    return res.text
+
+# convert info to bytes
+def info2bytes(info):
+    return bytes.fromhex(info.replace('\\x',''))
+
+# decrypt the encrypted string
+def decrypt(encrypted, key, iv):
+    # create cipher object
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+
+    # decrypt the encrypted string
+    decrypted = cipher.decrypt(base64.b64decode(encrypted))
+    decrypted = unpad(decrypted, 16).decode('utf-8').split('^')
+
+    return decrypted
+
+# get the encrypted string from the paint url
+def get_encrypted_text(paint_url):
+    # get response from the url
+    res_text = get_text_from_url(paint_url)
+
+    # find the first substring that matches the encrypted string
+    match = re.search(r'gv.init\("(.*?)"', res_text)
+    if match:
+        encrypted = match.group(1)
+        return encrypted
+    else:
+        raise ValueError(f'Cannot find encrypted string in {paint_url}')
 
 def generate_dzi_file(website, paint_id, info=None):
     if website == 'mhj':
         generate_dzi_file_mhj(paint_id, info)
     elif website == 'collection':
         generate_dzi_file_collection(paint_id)
+    elif website == 'digicol':
+        generate_dzi_file_digitcol(paint_id, info)
     else:
         raise ValueError(f'Unknown website {website}')
 
