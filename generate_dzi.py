@@ -15,7 +15,7 @@ import pandas as pd
 ################################################################
 
 # get gv info from url (minghuaji)
-def get_info():
+def get_info_mhj():
     gv_url = 'https://minghuaji.dpm.org.cn/js/gve.js'
 
     # get response from the url
@@ -38,7 +38,7 @@ def generate_dzi_file_mhj(paint_id, info=None):
     image_items = soup.select_one('#gundong_id').find_all('li')
 
     # get info
-    if info is None: info = get_info()
+    if info is None: info = get_info_mhj()
 
     # get key and vi and use them to decrypt the encrypted string
     key = info2bytes(info[1])
@@ -259,6 +259,14 @@ def write_dzi_file(dzi_filename, dzi_info):
     file.write(descriptor)
     file.close()
 
+# get gv info from url
+def get_info(website):
+    if website == 'mhj':
+        return get_info_mhj()
+    elif website == 'collection':
+        return None
+    elif website == 'digicol':
+        return get_info_digicol()
 
 if __name__ == '__main__':
     # create the directory to store the dzi files

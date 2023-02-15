@@ -42,7 +42,7 @@ def download_all(website):
     # read painting ids from csv
     df = pd.read_csv('paintings.csv')
 
-    info = get_info()
+    info = get_info(website)
     for index, row in df.iterrows():
         paint_id = row['id']
         print(f'Painting {paint_id} ({index + 1}/{len(df)}) ...')
