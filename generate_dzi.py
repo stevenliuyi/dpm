@@ -232,7 +232,7 @@ def generate_dzi_file(website, paint_id, info=None):
     elif website == 'collection':
         generate_dzi_file_collection(paint_id)
     elif website == 'digicol':
-        generate_dzi_file_digitcol(paint_id, info)
+        generate_dzi_file_digicol(paint_id, info)
     else:
         raise ValueError(f'Unknown website {website}')
 
